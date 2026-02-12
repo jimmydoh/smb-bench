@@ -60,11 +60,12 @@ class SMBBenchmarker:
             "test_name": test_name,
             "timestamp": datetime.now().isoformat(),
             "config": {
+                "mode": "NO-GENERATION (Real Files)" if no_generation else "SYNTHETIC (Generated)",
                 "large_file_mb": large_file_size_mb,
                 "small_files_count": small_file_count,
                 "small_min_kb": small_min_kb,
                 "small_max_kb": small_max_kb,
-                "no_generation": no_generation
+                "total_small_files_mb": 0  # To be calculated
             },
             "large_file": {},
             "small_files": {}
@@ -116,7 +117,9 @@ class SMBBenchmarker:
             if fpath.exists():
                 actual_size = fpath.stat().st_size
                 print(f"[INFO] No-Gen Mode: Using existing large file ({actual_size/1024/1024:.2f} MB)")
-                self.large_size = actual_size # Update config to match reality
+                # Update Config to reflect reality
+                self.large_size = actual_size
+                self.results['config']['large_file_mb'] = round(actual_size / 1024 / 1024, 2)
                 return fpath
             else:
                 print(f"[ERROR] No-Gen Mode enabled but {fpath} not found.")
@@ -141,7 +144,21 @@ class SMBBenchmarker:
         if self.no_generation:
             if len(existing) > 0:
                 print(f"[INFO] No-Gen Mode: Using {len(existing)} existing small files.")
-                self.small_count = len(existing) # Update config to match reality
+
+                # Calculate real stats
+                sizes = [f.stat().st_size for f in existing]
+                total_size = sum(sizes)
+                min_size = min(sizes)
+                max_size = max(sizes)
+
+                # Update Config to reflect reality
+                self.small_count = len(existing)
+                self.results['config']['small_files_count'] = self.small_count
+                self.results['config']['small_min_kb'] = round(min_size / 1024, 2)
+                self.results['config']['small_max_kb'] = round(max_size / 1024, 2)
+                self.results['config']['total_small_files_mb'] = round(total_size / 1024 / 1024, 2)
+
+                print(f"       -> Total Size: {total_size/1024/1024:.2f} MB")
                 return small_dir
             else:
                 print(f"[ERROR] No-Gen Mode enabled but no .bin files found in {small_dir}")
@@ -151,6 +168,9 @@ class SMBBenchmarker:
         # If count matches, reuse. If not, regenerate.
         if len(existing) == self.small_count:
             print(f"[INFO] Using {len(existing)} existing small files.")
+            # Still update total size for report
+            total_size = sum(f.stat().st_size for f in existing)
+            self.results['config']['total_small_files_mb'] = round(total_size / 1024 / 1024, 2)
             return small_dir
 
         print(f"[SETUP] Generating {self.small_count} small files ({self.small_min_size/1024:.1f}KB - {self.small_max_size/1024:.1f}KB)...")
@@ -164,6 +184,7 @@ class SMBBenchmarker:
             total_gen_size += size
 
         print(f"[SETUP] Total small files size: {total_gen_size/1024/1024:.2f} MB")
+        self.results['config']['total_small_files_mb'] = round(total_gen_size / 1024 / 1024, 2)
         return small_dir
 
     def run_large_test(self, local_file):
@@ -261,7 +282,7 @@ class SMBBenchmarker:
 
         print("\n" + "="*75)
         print(f"SUMMARY: {self.test_name}")
-        if self.no_generation: print("(NO-GENERATION MODE)")
+        if self.no_generation: print("(NO-GENERATION MODE - REAL FILES USED)")
         print("="*75)
         print(f"{'Metric':<20} | {'Upload':<25} | {'Download':<25}")
         print("-" * 75)
