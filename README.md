@@ -177,25 +177,26 @@ Small File Rand      | 45.2 files/s (3.21 MB/s)   | 52.8 files/s (3.87 MB/s)
 
 Detailed reports are saved to `<source>/smb_bench_reports/SMB_Report_<name>_<timestamp>.json`
 
-Report structure:
+Report structure (no-gen example):
 ```json
 {
-    "test_name": "baseline_test",
+    "test_name": "nogen_test",
     "timestamp": "2026-02-12T22:30:45.123456",
     "config": {
-        "large_file_mb": 1000,
-        "small_files_count": 500,
-        "small_min_kb": 10,
-        "small_max_kb": 100,
-        "no_generation": false
+        "mode": "NO-GENERATION (Real Files)",
+        "large_file_mb": 1000.0,
+        "small_files_count": 1000,
+        "small_min_kb": 10.05,
+        "small_max_kb": 99.97,
+        "total_small_files_mb": 53.58
     },
     "large_file": {
         "upload": {
-            "seconds": 8.234,
-            "mbps": 1003.44,
-            "MB_s": 125.43,
-            "MiB_s": 119.65,
-            "files_sec": 0.1
+            "seconds": 3.738,
+            "mbps": 2244.39,
+            "MB_s": 280.55,
+            "MiB_s": 267.55,
+            "files_sec": 0.3
         },
         "download": { ... }
     },
