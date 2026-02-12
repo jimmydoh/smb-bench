@@ -1,8 +1,20 @@
+#!/usr/bin/env python3
+"""
+Basic SMB Benchmarking Tool
+
+Example Usage:
+
+    Windows
+    python smb_bench.py "Z:\SMBTarget" "C:\LocalSource" "SetupRun" --large-mb 1000 --small-count 2000
+    python smb_bench.py "Z:\SMBTarget" "C:\LocalSource" "TestRun_01" --no-gen
+
+    Mac
+    python3 smb_bench.py /Volumes/Target /Users/Me/LocalSource "MacTest_01" --large-mb 1000 --small-count 1000
+"""
 import os
 import time
 import shutil
 import argparse
-import sys
 import uuid
 import json
 import random
@@ -10,12 +22,28 @@ from pathlib import Path
 from datetime import datetime
 
 class SMBBenchmarker:
+    """
+    Basic SMB Benchmarking Tool
+    """
     def __init__(self, target_path, source_path, test_name,
                  large_file_size_mb=1000,
                  small_file_count=1000,
                  small_min_kb=10,
                  small_max_kb=100,
                  no_generation=False):
+        """
+        Docstring for __init__
+
+        :param self: Description
+        :param target_path: Description
+        :param source_path: Description
+        :param test_name: Description
+        :param large_file_size_mb: Description
+        :param small_file_count: Description
+        :param small_min_kb: Description
+        :param small_max_kb: Description
+        :param no_generation: Description
+        """
 
         self.target = Path(target_path)
         self.source = Path(source_path)
@@ -63,6 +91,7 @@ class SMBBenchmarker:
                 written += bytes_to_write
 
     def _calculate_metrics(self, bytes_transferred, time_seconds, file_count=1):
+        """Calculates performance metrics for the given transfer."""
         if time_seconds == 0: return {}
 
         mb_per_sec = (bytes_transferred / 1_000_000) / time_seconds
@@ -79,6 +108,7 @@ class SMBBenchmarker:
         }
 
     def setup_large_file(self):
+        """Sets up the large test file."""
         fpath = self.local_staging / "large_test_file.bin"
 
         # CASE 1: No Generation Mode
@@ -101,6 +131,7 @@ class SMBBenchmarker:
         return fpath
 
     def setup_small_files(self):
+        """Sets up the small test files."""
         small_dir = self.local_staging / "small_files"
         small_dir.mkdir(exist_ok=True)
 
@@ -136,6 +167,7 @@ class SMBBenchmarker:
         return small_dir
 
     def run_large_test(self, local_file):
+        """Runs the large file test."""
         if not local_file: return
 
         print("\n--- Starting Large File Test (Throughput) ---")
@@ -172,6 +204,7 @@ class SMBBenchmarker:
         remote_file.unlink(missing_ok=True)
 
     def run_small_test(self, local_dir):
+        """Runs the small file test."""
         if not local_dir: return
 
         print("\n--- Starting Small File Test (Latency/Metadata) ---")
@@ -212,6 +245,7 @@ class SMBBenchmarker:
         shutil.rmtree(remote_dir)
 
     def cleanup_remote(self):
+        """Cleans up the remote staging directory."""
         try:
             if self.remote_staging.exists():
                 shutil.rmtree(self.remote_staging)
@@ -219,6 +253,7 @@ class SMBBenchmarker:
             print(f"[WARN] Could not fully clean remote directory: {e}")
 
     def save_report(self):
+        """Saves the benchmark report to a JSON file."""
         report_file = self.report_dir / f"SMB_Report_{self.test_name}_{int(time.time())}.json"
         with open(report_file, 'w') as f:
             json.dump(self.results, f, indent=4)
@@ -254,6 +289,7 @@ class SMBBenchmarker:
         print("="*75)
 
 def main():
+    """Main function to parse arguments and run the SMB benchmark."""
     parser = argparse.ArgumentParser(description="Synthetic SMB Speed Test Tool")
     parser.add_argument("target", help="Target SMB Path")
     parser.add_argument("source", help="Local staging directory")
