@@ -55,62 +55,62 @@ python src/smb_bench.py <target> <source> <name> [options]
 
 ## Example Usage Scenarios
 
-### Example 1: Basic Default Test
+### Example 1: Basic Default Test (Windows)
 
-Test a mounted SMB share with default parameters (1GB large file, 500 small files):
+Test a mapped network drive with default parameters (1GB large file, 500 small files):
 
 ```bash
-python src/smb_bench.py /mnt/myshare ~/smb_tests baseline_test
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests baseline_test
 ```
 
 This creates a baseline performance measurement with standard settings.
 
-### Example 2: Quick Small Test
+### Example 2: Quick Small Test (Windows)
 
 Run a faster test with smaller file sizes for quick validation:
 
 ```bash
-python src/smb_bench.py /mnt/myshare ~/smb_tests quick_test --large-mb 100 --small-count 100
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests quick_test --large-mb 100 --small-count 100
 ```
 
 Useful for quick checks or when testing in resource-constrained environments.
 
-### Example 3: Large File Throughput Focus
+### Example 3: Large File Throughput Focus (Windows)
 
 Focus on large file throughput with a 5GB test file:
 
 ```bash
-python src/smb_bench.py /mnt/myshare ~/smb_tests large_throughput --large-mb 5000 --small-count 0
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests large_throughput --large-mb 5000 --small-count 0
 ```
 
 Ideal for measuring maximum sequential transfer speeds (note: small file test will be skipped with 0 count).
 
-### Example 4: Small File Latency Focus
+### Example 4: Small File Latency Focus (Windows)
 
 Focus on metadata and small file operations with many tiny files:
 
 ```bash
-python src/smb_bench.py /mnt/myshare ~/smb_tests metadata_test --large-mb 100 --small-count 5000 --small-min-kb 1 --small-max-kb 10
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests metadata_test --large-mb 100 --small-count 5000 --small-min-kb 1 --small-max-kb 10
 ```
 
 Excellent for testing scenarios with many small files like code repositories or configuration directories.
 
-### Example 5: Mid-Size File Testing
+### Example 5: UNC Path Testing (Windows)
 
-Test with medium-sized files that are common in real-world scenarios:
+Test a Windows network share using UNC path notation:
 
 ```bash
-python src/smb_bench.py /mnt/myshare ~/smb_tests midsize_test --large-mb 2000 --small-count 1000 --small-min-kb 50 --small-max-kb 500
+python src/smb_bench.py \\servername\SMBTarget C:\Temp\smb_tests unc_test --large-mb 2000 --small-count 1000
 ```
 
-Simulates typical office document and media file transfers.
+Useful when testing shares that aren't mapped to drive letters.
 
-### Example 6: No-Generation Mode (Reuse Existing Files)
+### Example 6: No-Generation Mode (Windows)
 
 Run tests using previously generated files without regenerating them:
 
 ```bash
-python src/smb_bench.py /mnt/myshare ~/smb_tests repeat_test --no-gen
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests repeat_test --no-gen
 ```
 
 Useful for:
@@ -118,34 +118,36 @@ Useful for:
 - Avoiding time spent generating files
 - Testing with specific pre-created file content
 
-### Example 7: Windows Share Testing
-
-Test a Windows network share (adjust path format for your OS):
-
-```bash
-# Linux/macOS (mounted share)
-python src/smb_bench.py /mnt/windows_share ~/local_staging production_test --large-mb 2000 --small-count 1000
-
-# Windows (UNC path)
-python src/smb_bench.py "\\\\server\\share" C:\\temp\\staging production_test --large-mb 2000 --small-count 1000
-```
-
-### Example 8: Comparative Testing
+### Example 7: Comparative Testing (Windows)
 
 Run multiple tests with different parameters to compare performance:
 
 ```bash
 # Test 1: Baseline
-python src/smb_bench.py /mnt/myshare ~/smb_tests baseline --large-mb 1000 --small-count 500
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests baseline --large-mb 1000 --small-count 500
 
 # Test 2: Many small files
-python src/smb_bench.py /mnt/myshare ~/smb_tests many_small --large-mb 1000 --small-count 2000 --small-min-kb 5 --small-max-kb 20
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests many_small --large-mb 1000 --small-count 2000 --small-min-kb 5 --small-max-kb 20
 
 # Test 3: Large throughput
-python src/smb_bench.py /mnt/myshare ~/smb_tests large_files --large-mb 3000 --small-count 200
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests large_files --large-mb 3000 --small-count 200
 ```
 
 Then compare the JSON reports to identify optimal configurations.
+
+### Example 8: Linux/macOS Testing
+
+Test a mounted SMB share on Linux or macOS (syntax differs from Windows):
+
+```bash
+# Linux
+python src/smb_bench.py /mnt/smbshare /home/user/smb_tests linux_test --large-mb 1000 --small-count 500
+
+# macOS
+python src/smb_bench.py /Volumes/SMBShare ~/smb_tests macos_test --large-mb 1000 --small-count 500
+```
+
+Note the forward slashes and different mount point conventions compared to Windows.
 
 ## Understanding the Output
 
