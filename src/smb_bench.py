@@ -30,7 +30,8 @@ class SMBBenchmarker:
                  small_file_count=1000,
                  small_min_kb=10,
                  small_max_kb=100,
-                 no_generation=False):
+                 no_generation=False,
+                 batch_suffix=""):
         """
         Docstring for __init__
 
@@ -48,6 +49,7 @@ class SMBBenchmarker:
         self.target = Path(target_path)
         self.source = Path(source_path)
         self.test_name = test_name
+        self.batch_suffix = batch_suffix
         self.no_generation = no_generation
 
         # Config
@@ -275,13 +277,14 @@ class SMBBenchmarker:
 
     def save_report(self):
         """Saves the benchmark report to a JSON file."""
-        report_file = self.report_dir / f"SMB_Report_{self.test_name}_{int(time.time())}.json"
+        report_name = f"SMB_Report_{self.test_name}{self.batch_suffix}_{int(time.time())}.json"
+        report_file = self.report_dir / report_name
         with open(report_file, 'w') as f:
             json.dump(self.results, f, indent=4)
         print(f"\n[DONE] Detailed report saved to: {report_file}")
 
         print("\n" + "="*75)
-        print(f"SUMMARY: {self.test_name}")
+        print(f"SUMMARY: {self.test_name}{self.batch_suffix}")
         if self.no_generation: print("(NO-GENERATION MODE - REAL FILES USED)")
         print("="*75)
         print(f"{'Metric':<20} | {'Upload':<25} | {'Download':<25}")
@@ -309,6 +312,74 @@ class SMBBenchmarker:
 
         print("="*75)
 
+def calculate_aggregate_stats(all_results):
+    """Calculate aggregate statistics from multiple test runs."""
+    aggregate = {
+        "batch_count": len(all_results),
+        "test_name": all_results[0]["test_name"],
+        "timestamp": datetime.now().isoformat(),
+        "config": all_results[0]["config"],
+        "large_file": {},
+        "small_files": {}
+    }
+    
+    # Calculate stats for large file tests
+    if 'upload' in all_results[0]['large_file']:
+        for direction in ['upload', 'download']:
+            metrics = {}
+            for metric in ['seconds', 'mbps', 'MB_s', 'MiB_s', 'files_sec']:
+                values = [r['large_file'][direction][metric] for r in all_results]
+                metrics[f"{metric}_avg"] = round(sum(values) / len(values), 2)
+                metrics[f"{metric}_min"] = round(min(values), 2)
+                metrics[f"{metric}_max"] = round(max(values), 2)
+            aggregate['large_file'][direction] = metrics
+    
+    # Calculate stats for small file tests
+    if 'upload' in all_results[0]['small_files']:
+        for direction in ['upload', 'download']:
+            metrics = {}
+            for metric in ['seconds', 'mbps', 'MB_s', 'MiB_s', 'files_sec']:
+                values = [r['small_files'][direction][metric] for r in all_results]
+                metrics[f"{metric}_avg"] = round(sum(values) / len(values), 2)
+                metrics[f"{metric}_min"] = round(min(values), 2)
+                metrics[f"{metric}_max"] = round(max(values), 2)
+            aggregate['small_files'][direction] = metrics
+    
+    return aggregate
+
+def print_aggregate_summary(aggregate, report_file):
+    """Print aggregate summary to console."""
+    print("\n" + "="*75)
+    print(f"BATCH AGGREGATE SUMMARY: {aggregate['test_name']} ({aggregate['batch_count']} runs)")
+    print("="*75)
+    print(f"{'Metric':<20} | {'Upload':<25} | {'Download':<25}")
+    print("-" * 75)
+    
+    if 'upload' in aggregate['large_file']:
+        l_up = aggregate['large_file']['upload']
+        l_down = aggregate['large_file']['download']
+        print(f"{'Large File Seq':<20} |")
+        print(f"{'  Average':<20} | {l_up['MB_s_avg']:.2f} MB/s ({l_up['mbps_avg']:.2f} Mbps) | {l_down['MB_s_avg']:.2f} MB/s ({l_down['mbps_avg']:.2f} Mbps)")
+        print(f"{'  Min':<20} | {l_up['MB_s_min']:.2f} MB/s ({l_up['mbps_min']:.2f} Mbps) | {l_down['MB_s_min']:.2f} MB/s ({l_down['mbps_min']:.2f} Mbps)")
+        print(f"{'  Max':<20} | {l_up['MB_s_max']:.2f} MB/s ({l_up['mbps_max']:.2f} Mbps) | {l_down['MB_s_max']:.2f} MB/s ({l_down['mbps_max']:.2f} Mbps)")
+    else:
+        print(f"{'Large File Seq':<20} | {'SKIPPED':<25} | {'SKIPPED':<25}")
+    
+    print("-" * 75)
+    
+    if 'upload' in aggregate['small_files']:
+        s_up = aggregate['small_files']['upload']
+        s_down = aggregate['small_files']['download']
+        print(f"{'Small File Rand':<20} |")
+        print(f"{'  Average':<20} | {s_up['files_sec_avg']:.1f} files/s ({s_up['MB_s_avg']:.2f} MB/s) | {s_down['files_sec_avg']:.1f} files/s ({s_down['MB_s_avg']:.2f} MB/s)")
+        print(f"{'  Min':<20} | {s_up['files_sec_min']:.1f} files/s ({s_up['MB_s_min']:.2f} MB/s) | {s_down['files_sec_min']:.1f} files/s ({s_down['MB_s_min']:.2f} MB/s)")
+        print(f"{'  Max':<20} | {s_up['files_sec_max']:.1f} files/s ({s_up['MB_s_max']:.2f} MB/s) | {s_down['files_sec_max']:.1f} files/s ({s_down['MB_s_max']:.2f} MB/s)")
+    else:
+        print(f"{'Small File Rand':<20} | {'SKIPPED':<25} | {'SKIPPED':<25}")
+    
+    print("="*75)
+    print(f"\n[DONE] Aggregate report saved to: {report_file}")
+
 def main():
     """Main function to parse arguments and run the SMB benchmark."""
     parser = argparse.ArgumentParser(description="Synthetic SMB Speed Test Tool")
@@ -324,41 +395,73 @@ def main():
 
     # New flag
     parser.add_argument("--no-gen", action="store_true", help="Safe Mode: Do not generate or delete local source files. Use existing only.")
+    parser.add_argument("--batch", type=int, default=1, help="Number of times to run the test (default: 1)")
 
     args = parser.parse_args()
 
+    # Validate batch parameter
+    if args.batch < 1:
+        print("[ERROR] --batch must be >= 1")
+        return
+
     print(f"Initializing SMB Bench: {args.name}")
     if args.no_gen: print("[MODE] NO-GENERATION (Using existing files only)")
+    if args.batch > 1: print(f"[MODE] BATCH MODE: Running {args.batch} iterations")
 
-    bench = SMBBenchmarker(
-        args.target,
-        args.source,
-        args.name,
-        large_file_size_mb=args.large_mb,
-        small_file_count=args.small_count,
-        small_min_kb=args.small_min_kb,
-        small_max_kb=args.small_max_kb,
-        no_generation=args.no_gen
-    )
+    all_results = []
+    source_path = Path(args.source)
+    report_dir = source_path / "smb_bench_reports"
 
-    try:
-        large_file = bench.setup_large_file()
-        small_dir = bench.setup_small_files()
+    for run_num in range(1, args.batch + 1):
+        # Generate batch suffix if batch mode is enabled
+        batch_suffix = f"_{run_num:02d}" if args.batch > 1 else ""
+        
+        if args.batch > 1:
+            print(f"\n{'='*75}")
+            print(f"BATCH RUN {run_num}/{args.batch}")
+            print(f"{'='*75}")
 
-        # Only run tests if setup (or finding files) was successful
-        if large_file:
-            bench.run_large_test(large_file)
-        if small_dir:
-            bench.run_small_test(small_dir)
+        bench = SMBBenchmarker(
+            args.target,
+            args.source,
+            args.name,
+            large_file_size_mb=args.large_mb,
+            small_file_count=args.small_count,
+            small_min_kb=args.small_min_kb,
+            small_max_kb=args.small_max_kb,
+            no_generation=args.no_gen,
+            batch_suffix=batch_suffix
+        )
 
-        bench.save_report()
-    except KeyboardInterrupt:
-        print("\n[!] Test cancelled by user.")
-    except Exception as e:
-        print(f"\n[!] Error during execution: {e}")
-    finally:
-        print("Cleaning up remote artifacts...")
-        bench.cleanup_remote()
+        try:
+            large_file = bench.setup_large_file()
+            small_dir = bench.setup_small_files()
+
+            # Only run tests if setup (or finding files) was successful
+            if large_file:
+                bench.run_large_test(large_file)
+            if small_dir:
+                bench.run_small_test(small_dir)
+
+            bench.save_report()
+            all_results.append(bench.results)
+        except KeyboardInterrupt:
+            print("\n[!] Test cancelled by user.")
+            break
+        except Exception as e:
+            print(f"\n[!] Error during execution: {e}")
+            break
+        finally:
+            print("Cleaning up remote artifacts...")
+            bench.cleanup_remote()
+
+    # Generate aggregate report if batch mode was used and we have results
+    if args.batch > 1 and len(all_results) > 1:
+        aggregate = calculate_aggregate_stats(all_results)
+        aggregate_file = report_dir / f"SMB_Report_{args.name}_AGGREGATE_{int(time.time())}.json"
+        with open(aggregate_file, 'w') as f:
+            json.dump(aggregate, f, indent=4)
+        print_aggregate_summary(aggregate, aggregate_file)
 
 if __name__ == "__main__":
     main()

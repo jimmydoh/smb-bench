@@ -52,6 +52,7 @@ python src/smb_bench.py <target> <source> <name> [options]
 | `--small-min-kb` | 10 | Minimum size of small files in kilobytes |
 | `--small-max-kb` | 100 | Maximum size of small files in kilobytes |
 | `--no-gen` | False | Safe mode: Use existing files only, don't generate new ones |
+| `--batch` | 1 | Number of times to run the test (generates aggregate statistics) |
 
 ## Example Usage Scenarios
 
@@ -149,6 +150,41 @@ python src/smb_bench.py /Volumes/SMBShare ~/smb_tests macos_test --large-mb 1000
 
 Note the forward slashes and different mount point conventions compared to Windows.
 
+### Example 9: Batch Mode Testing (Windows)
+
+Run the same test multiple times and get aggregate statistics (average, min, max):
+
+```bash
+# Run test 3 times
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests batch_test --large-mb 1000 --small-count 500 --batch 3
+```
+
+This will:
+- Execute the test 3 times
+- Generate individual reports: `SMB_Report_batch_test_01_*.json`, `SMB_Report_batch_test_02_*.json`, `SMB_Report_batch_test_03_*.json`
+- Generate an aggregate report: `SMB_Report_batch_test_AGGREGATE_*.json` with average, min, and max statistics
+- Display aggregate console output showing performance ranges
+
+Perfect for:
+- Getting statistically reliable performance measurements
+- Identifying performance variance
+- Establishing performance baselines with confidence intervals
+- Detecting intermittent performance issues
+
+### Example 10: Batch Mode with No-Generation (Windows)
+
+Combine batch mode with no-generation for consistent multi-run testing:
+
+```bash
+# First, generate files once
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests consistent_test --large-mb 500 --small-count 250
+
+# Then run 5 iterations using the same files
+python src/smb_bench.py S:\SMBTarget C:\Temp\smb_tests consistent_test --no-gen --batch 5
+```
+
+This ensures all test runs use identical test data for the most accurate comparison.
+
 ## Understanding the Output
 
 ### Console Output
@@ -203,6 +239,43 @@ Report structure (no-gen example):
     "small_files": { ... }
 }
 ```
+
+### Batch Mode Reports
+
+When using `--batch` mode (with value > 1), you'll get:
+
+1. **Individual reports** for each run with batch suffix:
+   - `SMB_Report_<name>_01_<timestamp>.json`
+   - `SMB_Report_<name>_02_<timestamp>.json`
+   - etc.
+
+2. **Aggregate report** with statistics across all runs:
+   - `SMB_Report_<name>_AGGREGATE_<timestamp>.json`
+
+Aggregate report structure:
+```json
+{
+    "batch_count": 3,
+    "test_name": "batch_test",
+    "timestamp": "2026-02-13T00:00:00.000000",
+    "config": { ... },
+    "large_file": {
+        "upload": {
+            "MB_s_avg": 125.43,
+            "MB_s_min": 120.15,
+            "MB_s_max": 130.22,
+            "mbps_avg": 1003.44,
+            "mbps_min": 961.20,
+            "mbps_max": 1041.76,
+            ...
+        },
+        "download": { ... }
+    },
+    "small_files": { ... }
+}
+```
+
+The aggregate report provides average (`_avg`), minimum (`_min`), and maximum (`_max`) for all metrics.
 
 ## Interpreting Results
 
@@ -263,7 +336,7 @@ This is normal for high-latency connections or shares. Reduce `--small-count` fo
 
 ### Inconsistent results
 
-- Run multiple tests and average the results
+- Run multiple tests and average the results (use `--batch` for automatic aggregation)
 - Close other applications using the network/disk
 - Use `--no-gen` to ensure consistent test files
 - Test at different times to account for network load
@@ -271,11 +344,12 @@ This is normal for high-latency connections or shares. Reduce `--small-count` fo
 ## Tips for Effective Testing
 
 1. **Baseline First**: Always run a baseline test with default parameters
-2. **Multiple Runs**: Run tests 3-5 times and average results for accuracy
+2. **Multiple Runs**: Use `--batch 3` or `--batch 5` to automatically run tests multiple times and get aggregate statistics
 3. **Isolate Variables**: Change one parameter at a time when comparing
 4. **Document Conditions**: Note network load, time of day, and other factors
 5. **Clean Tests**: Use `--no-gen` after initial generation for consistent comparisons
 6. **Real-World Simulation**: Match your test parameters to your actual use case
+7. **Statistical Confidence**: Batch mode provides min/max/average metrics to understand performance variance
 
 ## License
 
