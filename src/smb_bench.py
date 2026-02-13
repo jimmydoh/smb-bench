@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-r"""
+"""
 Basic SMB Benchmarking Tool
 
 Example Usage:
@@ -316,7 +316,7 @@ def calculate_aggregate_stats(all_results):
     """Calculate aggregate statistics from multiple test runs."""
     if not all_results:
         return None
-    
+
     aggregate = {
         "batch_count": len(all_results),
         "test_name": all_results[0]["test_name"],
@@ -325,7 +325,7 @@ def calculate_aggregate_stats(all_results):
         "large_file": {},
         "small_files": {}
     }
-    
+
     # Calculate stats for large file tests
     if 'upload' in all_results[0]['large_file']:
         for direction in ['upload', 'download']:
@@ -336,7 +336,7 @@ def calculate_aggregate_stats(all_results):
                 metrics[f"{metric}_min"] = round(min(values), 2)
                 metrics[f"{metric}_max"] = round(max(values), 2)
             aggregate['large_file'][direction] = metrics
-    
+
     # Calculate stats for small file tests
     if 'upload' in all_results[0]['small_files']:
         for direction in ['upload', 'download']:
@@ -347,7 +347,7 @@ def calculate_aggregate_stats(all_results):
                 metrics[f"{metric}_min"] = round(min(values), 2)
                 metrics[f"{metric}_max"] = round(max(values), 2)
             aggregate['small_files'][direction] = metrics
-    
+
     return aggregate
 
 def print_aggregate_summary(aggregate, report_file):
@@ -357,7 +357,7 @@ def print_aggregate_summary(aggregate, report_file):
     print("="*75)
     print(f"{'Metric':<20} | {'Upload':<25} | {'Download':<25}")
     print("-" * 75)
-    
+
     if 'upload' in aggregate['large_file']:
         l_up = aggregate['large_file']['upload']
         l_down = aggregate['large_file']['download']
@@ -367,9 +367,9 @@ def print_aggregate_summary(aggregate, report_file):
         print(f"{'  Max':<20} | {l_up['MB_s_max']:.2f} MB/s ({l_up['mbps_max']:.2f} Mbps) | {l_down['MB_s_max']:.2f} MB/s ({l_down['mbps_max']:.2f} Mbps)")
     else:
         print(f"{'Large File Seq':<20} | {'SKIPPED':<25} | {'SKIPPED':<25}")
-    
+
     print("-" * 75)
-    
+
     if 'upload' in aggregate['small_files']:
         s_up = aggregate['small_files']['upload']
         s_down = aggregate['small_files']['download']
@@ -379,7 +379,7 @@ def print_aggregate_summary(aggregate, report_file):
         print(f"{'  Max':<20} | {s_up['files_sec_max']:.1f} files/s ({s_up['MB_s_max']:.2f} MB/s) | {s_down['files_sec_max']:.1f} files/s ({s_down['MB_s_max']:.2f} MB/s)")
     else:
         print(f"{'Small File Rand':<20} | {'SKIPPED':<25} | {'SKIPPED':<25}")
-    
+
     print("="*75)
     print(f"\n[DONE] Aggregate report saved to: {report_file}")
 
@@ -418,7 +418,7 @@ def main():
     for run_num in range(1, args.batch + 1):
         # Generate batch suffix if batch mode is enabled
         batch_suffix = f"_{run_num:02d}" if args.batch > 1 else ""
-        
+
         if args.batch > 1:
             print(f"\n{'='*75}")
             print(f"BATCH RUN {run_num}/{args.batch}")
