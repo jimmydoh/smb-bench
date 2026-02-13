@@ -314,6 +314,9 @@ class SMBBenchmarker:
 
 def calculate_aggregate_stats(all_results):
     """Calculate aggregate statistics from multiple test runs."""
+    if not all_results:
+        return None
+    
     aggregate = {
         "batch_count": len(all_results),
         "test_name": all_results[0]["test_name"],
@@ -456,12 +459,13 @@ def main():
             bench.cleanup_remote()
 
     # Generate aggregate report if batch mode was used and we have results
-    if args.batch > 1 and len(all_results) > 1:
+    if args.batch > 1 and len(all_results) >= 1:
         aggregate = calculate_aggregate_stats(all_results)
-        aggregate_file = report_dir / f"SMB_Report_{args.name}_AGGREGATE_{int(time.time())}.json"
-        with open(aggregate_file, 'w') as f:
-            json.dump(aggregate, f, indent=4)
-        print_aggregate_summary(aggregate, aggregate_file)
+        if aggregate:
+            aggregate_file = report_dir / f"SMB_Report_{args.name}_AGGREGATE_{int(time.time())}.json"
+            with open(aggregate_file, 'w') as f:
+                json.dump(aggregate, f, indent=4)
+            print_aggregate_summary(aggregate, aggregate_file)
 
 if __name__ == "__main__":
     main()
