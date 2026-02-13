@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+r"""
 Basic SMB Benchmarking Tool
 
 Example Usage:
