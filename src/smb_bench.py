@@ -18,8 +18,17 @@ import argparse
 import uuid
 import json
 import random
+import re
+import socket
 from pathlib import Path
 from datetime import datetime
+
+def _extract_server_from_path(path_str):
+    """Extract server hostname from a UNC path (e.g. \\\\server\\share or //server/share)."""
+    match = re.match(r'^[/\\]{2}([^/\\]+)', str(path_str))
+    if match:
+        return match.group(1)
+    return None
 
 class SMBBenchmarker:
     """
@@ -69,6 +78,7 @@ class SMBBenchmarker:
                 "small_max_kb": small_max_kb,
                 "total_small_files_mb": 0  # To be calculated
             },
+            "latency": {},
             "large_file": {},
             "small_files": {}
         }
@@ -109,6 +119,45 @@ class SMBBenchmarker:
             "MiB_s": round(mib_per_sec, 2),
             "files_sec": round(files_per_sec, 1)
         }
+
+    def measure_latency(self, server, port=445, count=5, interval=1.0):
+        """Measure TCP latency to the SMB server port using SYN/SYN-ACK timing."""
+        print(f"\n--- Measuring TCP Latency to {server}:{port} ({count} pings) ---")
+        times = []
+
+        for i in range(count):
+            try:
+                start = time.perf_counter()
+                with socket.create_connection((server, port), timeout=5):
+                    elapsed = (time.perf_counter() - start) * 1000  # ms
+                times.append(elapsed)
+                print(f"  Ping {i+1}/{count}: {elapsed:.2f} ms")
+            except Exception as e:
+                print(f"  Ping {i+1}/{count}: FAILED ({e})")
+
+            if i < count - 1:
+                time.sleep(interval)
+
+        if not times:
+            print("  [WARN] All latency measurements failed.")
+            return None
+
+        min_ms = round(min(times), 2)
+        avg_ms = round(sum(times) / len(times), 2)
+        max_ms = round(max(times), 2)
+        print(f"  -> Results: min={min_ms}ms | avg={avg_ms}ms | max={max_ms}ms")
+
+        result = {
+            "server": server,
+            "port": port,
+            "count": count,
+            "successful": len(times),
+            "min_ms": min_ms,
+            "avg_ms": avg_ms,
+            "max_ms": max_ms
+        }
+        self.results["latency"] = result
+        return result
 
     def setup_large_file(self):
         """Sets up the large test file."""
@@ -287,6 +336,12 @@ class SMBBenchmarker:
         print(f"SUMMARY: {self.test_name}{self.batch_suffix}")
         if self.no_generation: print("(NO-GENERATION MODE - REAL FILES USED)")
         print("="*75)
+
+        if self.results.get("latency"):
+            lat = self.results["latency"]
+            print(f"TCP Latency ({lat['server']}:{lat['port']}): min={lat['min_ms']}ms | avg={lat['avg_ms']}ms | max={lat['max_ms']}ms")
+            print("-" * 75)
+
         print(f"{'Metric':<20} | {'Upload':<25} | {'Download':<25}")
         print("-" * 75)
 
@@ -322,9 +377,21 @@ def calculate_aggregate_stats(all_results):
         "test_name": all_results[0]["test_name"],
         "timestamp": datetime.now().isoformat(),
         "config": all_results[0]["config"],
+        "latency": {},
         "large_file": {},
         "small_files": {}
     }
+
+    # Calculate stats for latency
+    latency_results = [r["latency"] for r in all_results if r.get("latency")]
+    if latency_results:
+        aggregate["latency"] = {
+            "server": latency_results[0]["server"],
+            "port": latency_results[0]["port"],
+            "min_ms": round(min(r["min_ms"] for r in latency_results), 2),
+            "avg_ms": round(sum(r["avg_ms"] for r in latency_results) / len(latency_results), 2),
+            "max_ms": round(max(r["max_ms"] for r in latency_results), 2),
+        }
 
     # Calculate stats for large file tests
     if 'upload' in all_results[0]['large_file']:
@@ -355,6 +422,12 @@ def print_aggregate_summary(aggregate, report_file):
     print("\n" + "="*75)
     print(f"BATCH AGGREGATE SUMMARY: {aggregate['test_name']} ({aggregate['batch_count']} runs)")
     print("="*75)
+
+    if aggregate.get("latency"):
+        lat = aggregate["latency"]
+        print(f"TCP Latency ({lat['server']}:{lat['port']}): min={lat['min_ms']}ms | avg={lat['avg_ms']}ms | max={lat['max_ms']}ms")
+        print("-" * 75)
+
     print(f"{'Metric':<20} | {'Upload':<25} | {'Download':<25}")
     print("-" * 75)
 
@@ -399,6 +472,7 @@ def main():
     # New flag
     parser.add_argument("--no-gen", action="store_true", help="Safe Mode: Do not generate or delete local source files. Use existing only.")
     parser.add_argument("--batch", type=int, default=1, help="Number of times to run the test (default: 1)")
+    parser.add_argument("--server", default=None, help="Server hostname or IP for TCP latency measurement (port 445). Auto-detected from UNC paths if not provided.")
 
     args = parser.parse_args()
 
@@ -410,6 +484,13 @@ def main():
     print(f"Initializing SMB Bench: {args.name}")
     if args.no_gen: print("[MODE] NO-GENERATION (Using existing files only)")
     if args.batch > 1: print(f"[MODE] BATCH MODE: Running {args.batch} iterations")
+
+    # Determine server for latency measurement
+    latency_server = args.server or _extract_server_from_path(args.target)
+    if latency_server:
+        print(f"[INFO] TCP latency target: {latency_server}:445")
+    else:
+        print("[INFO] No server detected for latency measurement (use --server to enable)")
 
     all_results = []
     source_path = Path(args.source)
@@ -437,6 +518,9 @@ def main():
         )
 
         try:
+            if latency_server:
+                bench.measure_latency(latency_server)
+
             large_file = bench.setup_large_file()
             small_dir = bench.setup_small_files()
 

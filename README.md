@@ -6,6 +6,7 @@ A comprehensive Python-based benchmarking tool for testing SMB (Server Message B
 
 - **Large File Throughput Testing**: Measures sequential read/write speeds with large files
 - **Small File Latency Testing**: Measures metadata operation speeds with many small files
+- **TCP Latency Measurement**: Measures network latency to the SMB server using TCP SYN/SYN-ACK timing (no ICMP required)
 - **Bidirectional Testing**: Tests both upload and download speeds
 - **Flexible Configuration**: Customizable file sizes, counts, and test parameters
 - **No-Generation Mode**: Run tests using existing files without regeneration
@@ -53,6 +54,7 @@ python src/smb_bench.py <target> <source> <name> [options]
 | `--small-max-kb` | 100 | Maximum size of small files in kilobytes |
 | `--no-gen` | False | Safe mode: Use existing files only, don't generate new ones |
 | `--batch` | 1 | Number of times to run the test (generates aggregate statistics) |
+| `--server` | None | Server hostname or IP for TCP latency measurement (port 445). Auto-detected from UNC paths (`\\server\share`) when not provided. |
 
 ## Example Usage Scenarios
 
@@ -201,6 +203,8 @@ Example output:
 ===========================================================================
 SUMMARY: baseline_test
 ===========================================================================
+TCP Latency (192.168.1.10:445): min=0.42ms | avg=0.55ms | max=0.71ms
+---------------------------------------------------------------------------
 Metric               | Upload                    | Download
 ---------------------------------------------------------------------------
 Large File Seq       | 125.43 MB/s (1003.44 Mbps) | 142.67 MB/s (1141.36 Mbps)
@@ -225,6 +229,15 @@ Report structure (no-gen example):
         "small_min_kb": 10.05,
         "small_max_kb": 99.97,
         "total_small_files_mb": 53.58
+    },
+    "latency": {
+        "server": "192.168.1.10",
+        "port": 445,
+        "count": 5,
+        "successful": 5,
+        "min_ms": 0.42,
+        "avg_ms": 0.55,
+        "max_ms": 0.71
     },
     "large_file": {
         "upload": {
@@ -259,6 +272,13 @@ Aggregate report structure:
     "test_name": "batch_test",
     "timestamp": "2026-02-13T00:00:00.000000",
     "config": { ... },
+    "latency": {
+        "server": "192.168.1.10",
+        "port": 445,
+        "min_ms": 0.38,
+        "avg_ms": 0.55,
+        "max_ms": 0.82
+    },
     "large_file": {
         "upload": {
             "MB_s_avg": 125.43,
@@ -345,11 +365,12 @@ This is normal for high-latency connections or shares. Reduce `--small-count` fo
 
 1. **Baseline First**: Always run a baseline test with default parameters
 2. **Multiple Runs**: Use `--batch 3` or `--batch 5` to automatically run tests multiple times and get aggregate statistics
-3. **Isolate Variables**: Change one parameter at a time when comparing
-4. **Document Conditions**: Note network load, time of day, and other factors
-5. **Clean Tests**: Use `--no-gen` after initial generation for consistent comparisons
-6. **Real-World Simulation**: Match your test parameters to your actual use case
-7. **Statistical Confidence**: Batch mode provides min/max/average metrics to understand performance variance
+3. **Latency Measurement**: Use `--server <hostname>` (or UNC paths like `\\server\share`) to include TCP latency metrics in results
+4. **Isolate Variables**: Change one parameter at a time when comparing
+5. **Document Conditions**: Note network load, time of day, and other factors
+6. **Clean Tests**: Use `--no-gen` after initial generation for consistent comparisons
+7. **Real-World Simulation**: Match your test parameters to your actual use case
+8. **Statistical Confidence**: Batch mode provides min/max/average metrics to understand performance variance
 
 ## License
 
